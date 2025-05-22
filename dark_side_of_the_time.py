@@ -40,6 +40,8 @@ class Activity:
 def main():
     activities = read_activities()
     output = "\n".join([
+        create_total_activity_report(activities),
+        "",
         create_weekly_activity_report(activities),
         "",
         create_daily_activity_report(activities)
@@ -61,26 +63,18 @@ def read_activities() -> list[Activity]:
         exit(1)
     return [Activity.deserialize(x, schema) for x in csv.DictReader(io.StringIO(data_csv))]
 
-def create_weekly_activity_report(activities: list[Activity]) -> str:
+def create_activity_duration_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    last_start = activities[-1].start
-    last_year, last_week, _ = last_start.isocalendar()
-    week_activities = [
-        x for x in activities
-        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
-    ]
 
     activity_totals = defaultdict(int)
     total_duration = 0
-    for activity in week_activities:
+    for activity in activities:
         duration = int((activity.end - activity.start).total_seconds() / 60)
         activity_totals[activity.activity_type] += duration
         total_duration += duration
 
     output = [
-        f"# Week {last_week}",
-        "",
         "| Activity Type | Total Duration (h) | Relative Duration |",
         "|---------------|--------------------|-------------------|",
     ]
@@ -88,8 +82,6 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
     for activity_type, duration in sorted_activity_totals:
         output.append(f"| {activity_type} | {duration / 60.0:.2f}"
             f"| {duration / total_duration:.2f} |")
-    output.append("")
-    output.append(f"**Total Duration:** {total_duration / 60.0:.2f}h")
     return "\n".join(output)
 
 def create_daily_activity_report(activities: list[Activity]) -> str:
@@ -104,8 +96,6 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
     ]
 
     today_activities = [x for x in activities if x.start.date() == last_start.date()]
-    total_duration = 0
-    total_break_duration = 0
     for i, activity in enumerate(today_activities):
         start = activity.start.strftime("%H:%M")
         end = activity.end.strftime("%H:%M")
@@ -117,15 +107,79 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
             break_duration = int((activity.start - previous.end).total_seconds() / 60)
         output.append(f"| {start} | {end} | {duration} | {break_duration} "
                       f"| {activity.activity_type} |")
-        total_duration += duration
-        total_break_duration += break_duration
 
+    total_duration = get_total_duration(today_activities) / 60.0
+    total_break_duration = get_total_break_duration(today_activities) / 60.0
     output.append("")
-    output.append(f"**Total Duration:** {total_duration / 60.0:.2f}h")
-    output.append(f"**Total Break Duration:** {total_break_duration / 60.0:.2f}h")
+    output.append(f"**Total Duration:** {total_duration :.2f}h")
+    output.append(f"**Total Break Duration:** {total_break_duration:.2f}h")
     return "\n".join(output)
 
+def create_total_activity_report(activities: list[Activity]) -> str:
+    if not activities:
+        return ""
 
+    total_duration = get_total_duration(activities) / 60.0
+    total_break_duration = get_total_break_duration(activities) / 60.0
+    output = [
+        f"# Total",
+        "",
+        create_activity_duration_report(activities),
+        "",
+        f"**Total Duration:** {total_duration :.2f}h",
+        f"**Total Break Duration:** {total_break_duration:.2f}h",
+    ]
+    return "\n".join(output)
+
+def create_weekly_activity_report(activities: list[Activity]) -> str:
+    if not activities:
+        return ""
+    last_start = activities[-1].start
+    last_year, last_week, _ = last_start.isocalendar()
+    week_activities = [
+        x for x in activities
+        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
+    ]
+
+    total_duration = get_total_duration(week_activities) / 60.0
+    total_break_duration = get_total_break_duration(week_activities) / 60.0
+    output = [
+        f"# Week {last_week}",
+        "",
+        create_activity_duration_report(week_activities),
+        "",
+        f"**Total Duration:** {total_duration :.2f}h",
+        f"**Total Break Duration:** {total_break_duration:.2f}h",
+    ]
+    return "\n".join(output)
+
+def get_total_break_duration(activities: list[Activity]) -> int:
+    total_break_duration = 0
+    if not activities:
+        return total_break_duration
+
+    for i, activity in enumerate(activities):
+        if i == 0:
+            break_duration = 0
+        else:
+            previous = activities[i - 1]
+            if activity.start.date() != previous.end.date():
+                continue
+            break_duration = int((activity.start - previous.end).total_seconds() / 60)
+        total_break_duration += break_duration
+    
+    return total_break_duration
+
+def get_total_duration(activities: list[Activity]) -> int:
+    total_duration = 0
+    if not activities:
+        return total_duration
+
+    for activity in activities:
+        duration = int((activity.end - activity.start).total_seconds() / 60)
+        total_duration += duration
+
+    return total_duration
 
 
 if __name__ == "__main__":
