@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +40,9 @@ class Activity:
 def main():
     activities = read_activities()
     output = "\n".join([
-        create_report_of_today_activities(activities)
+        create_weekly_activity_report(activities),
+        "",
+        create_daily_activity_report(activities)
     ])
     print(output)
 
@@ -58,7 +61,38 @@ def read_activities() -> list[Activity]:
         exit(1)
     return [Activity.deserialize(x, schema) for x in csv.DictReader(io.StringIO(data_csv))]
 
-def create_report_of_today_activities(activities: list[Activity]) -> str:
+def create_weekly_activity_report(activities: list[Activity]) -> str:
+    if not activities:
+        return ""
+    last_start = activities[-1].start
+    last_year, last_week, _ = last_start.isocalendar()
+    week_activities = [
+        x for x in activities
+        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
+    ]
+
+    activity_totals = defaultdict(int)
+    total_duration = 0
+    for activity in week_activities:
+        duration = int((activity.end - activity.start).total_seconds() / 60)
+        activity_totals[activity.activity_type] += duration
+        total_duration += duration
+
+    output = [
+        f"# Week {last_week}",
+        "",
+        "| Activity Type | Total Duration (h) | Relative Duration |",
+        "|---------------|--------------------|-------------------|",
+    ]
+    sorted_activity_totals = sorted(activity_totals.items(), key=lambda x: x[1], reverse=True)
+    for activity_type, duration in sorted_activity_totals:
+        output.append(f"| {activity_type} | {duration / 60.0:.2f}"
+            f"| {duration / total_duration:.2f} |")
+    output.append("")
+    output.append(f"**Total Duration:** {total_duration / 60.0:.2f}h")
+    return "\n".join(output)
+
+def create_daily_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
     last_start = activities[-1].start
@@ -87,8 +121,8 @@ def create_report_of_today_activities(activities: list[Activity]) -> str:
         total_break_duration += break_duration
 
     output.append("")
-    output.append(f"**Total Duration:** {total_duration / 60:.2f}h")
-    output.append(f"**Total Break Duration:** {total_break_duration / 60:.2f}h")
+    output.append(f"**Total Duration:** {total_duration / 60.0:.2f}h")
+    output.append(f"**Total Break Duration:** {total_break_duration / 60.0:.2f}h")
     return "\n".join(output)
 
 
