@@ -1,34 +1,38 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple
 import csv
 import io
 import os
 
 DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV = "DARK_SIDE_OF_THE_TIME_DATA_FILE"
 DARK_SIDE_OF_THE_TIME_SCHEMA_FILE_ENV = "DARK_SIDE_OF_THE_TIME_SCHEMA_FILE"
+DATE_FORMAT = "%b %d"
+DATE_TIME_FORMAT = f"{DATE_FORMAT} %H:%M"
 
 
 @dataclass
 class Activity:
-    date: str
     start: datetime
     end: datetime
     activity_type: str
 
     @classmethod
-    def deserialize(cls, dirty_string: dict[str, str], schema: str) -> "Activity":
-        string = {k.strip(): v.strip() for k, v in dirty_string.items()}
-        activity_type = string["activity_type"].strip()
-        time_end = string["time_end"].strip()
-        if not time_end:
-            time_end = string["time_start"].strip()
+    def deserialize(cls, dirty_values: dict[str, str], schema: str) -> "Activity":
+        values = {k.strip(): v.strip() for k, v in dirty_values.items()}
+        activity_type = values["activity_type"].strip()
         if activity_type not in schema:
             raise ValueError(f"Activity type '{activity_type}' not found in schema.")
-        return cls(date=string["date"].strip(),
-                   start=datetime.strptime(string["time_start"].strip(), "%H:%M"),
-                   end=datetime.strptime(time_end, "%H:%M"),
+
+        date_str = values["date"].strip()
+        time_end = values["time_end"].strip()
+        if not time_end:
+            time_end = values["time_start"].strip()
+        date_start_str = f"{date_str} {values['time_start'].strip()}"
+        date_end_str = f"{date_str} {time_end}"
+
+        return cls(start=datetime.strptime(date_start_str, DATE_TIME_FORMAT),
+                   end=datetime.strptime(date_end_str, DATE_TIME_FORMAT),
                    activity_type=activity_type)
 
 
@@ -38,7 +42,6 @@ def main():
         create_report_of_today_activities(activities)
     ])
     print(output)
-
 
 def read_activities() -> list[Activity]:
     data_str = os.environ.get(DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV)
@@ -55,18 +58,18 @@ def read_activities() -> list[Activity]:
         exit(1)
     return [Activity.deserialize(x, schema) for x in csv.DictReader(io.StringIO(data_csv))]
 
-def create_report_of_today_activities(activities = list[Activity]) -> str:
+def create_report_of_today_activities(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    last_date = activities[-1].date
+    last_start = activities[-1].start
     output = [
-        f"# {last_date}",
+        f"# {last_start.strftime(DATE_FORMAT)}",
         "",
         "| Start | End | Duration (min) | Break Duration (min) | Activity Type |",
         "|-------|-----|---------------|-----------------------|---------------|",
     ]
 
-    today_activities = [x for x in activities if x.date == last_date]
+    today_activities = [x for x in activities if x.start.date() == last_start.date()]
     total_duration = 0
     total_break_duration = 0
     for i, activity in enumerate(today_activities):
