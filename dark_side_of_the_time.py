@@ -27,10 +27,11 @@ class Activity:
             raise ValueError(f"Activity type '{activity_type}' not found in schema.")
 
         date_str = values["date"].strip()
+        time_start = values["time_start"].strip()
         time_end = values["time_end"].strip()
         if not time_end:
-            time_end = values["time_start"].strip()
-        date_start_str = f"{date_str} {values['time_start'].strip()}"
+            time_end = time_start
+        date_start_str = f"{date_str} {time_start}"
         date_end_str = f"{date_str} {time_end}"
 
         return cls(
@@ -38,6 +39,16 @@ class Activity:
             end=datetime.strptime(date_end_str, DATE_TIME_FORMAT),
             activity_type=activity_type,
         )
+
+    def get_break_duration_in_minutes(self, previous: "Activity") -> int:
+        break_duration = int((self.start - previous.end).total_seconds() / 60)
+        assert break_duration >= 0
+        return break_duration
+
+    def get_duration_in_minutes(self) -> int:
+        duration = int((self.end - self.start).total_seconds() / 60)
+        assert duration >= 0
+        return duration
 
 
 def main():
@@ -83,7 +94,7 @@ def create_activity_duration_report(activities: list[Activity]) -> str:
     activity_totals: DefaultDict[str, int] = defaultdict(int)
     total_duration = 0
     for activity in activities:
-        duration = int((activity.end - activity.start).total_seconds() / 60)
+        duration = activity.get_duration_in_minutes()
         activity_totals[activity.activity_type] += duration
         total_duration += duration
 
@@ -117,12 +128,12 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
     for i, activity in enumerate(today_activities):
         start = activity.start.strftime("%H:%M")
         end = activity.end.strftime("%H:%M")
-        duration = int((activity.end - activity.start).total_seconds() / 60)
+        duration = activity.get_duration_in_minutes()
         if i == 0:
             break_duration = 0
         else:
             previous = today_activities[i - 1]
-            break_duration = int((activity.start - previous.end).total_seconds() / 60)
+            break_duration = activity.get_break_duration_in_minutes(previous)
         output.append(
             f"| {start} | {end} | {duration} | {break_duration} "
             f"| {activity.activity_type} |"
@@ -131,7 +142,7 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
     total_duration = get_total_duration(today_activities) / 60.0
     total_break_duration = get_total_break_duration(today_activities) / 60.0
     output.append("")
-    output.append(f"**Total Duration:** {total_duration :.2f}h")
+    output.append(f"**Total Duration:** {total_duration:.2f}h")
     output.append(f"**Total Break Duration:** {total_break_duration:.2f}h")
     return "\n".join(output)
 
@@ -143,11 +154,11 @@ def create_total_activity_report(activities: list[Activity]) -> str:
     total_duration = get_total_duration(activities) / 60.0
     total_break_duration = get_total_break_duration(activities) / 60.0
     output = [
-        f"# Total",
+        "# Total",
         "",
         create_activity_duration_report(activities),
         "",
-        f"**Total Duration:** {total_duration :.2f}h",
+        f"**Total Duration:** {total_duration:.2f}h",
         f"**Total Break Duration:** {total_break_duration:.2f}h",
     ]
     return "\n".join(output)
@@ -166,7 +177,7 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
         "",
         create_activity_duration_report(week_activities),
         "",
-        f"**Total Duration:** {total_duration :.2f}h",
+        f"**Total Duration:** {total_duration:.2f}h",
         f"**Total Break Duration:** {total_break_duration:.2f}h",
     ]
     return "\n".join(output)
@@ -189,7 +200,7 @@ def get_total_break_duration(activities: list[Activity]) -> int:
             previous = activities[i - 1]
             if activity.start.date() != previous.end.date():
                 continue
-            break_duration = int((activity.start - previous.end).total_seconds() / 60)
+            break_duration = activity.get_break_duration_in_minutes(previous)
         total_break_duration += break_duration
 
     return total_break_duration
@@ -201,7 +212,7 @@ def get_total_duration(activities: list[Activity]) -> int:
         return total_duration
 
     for activity in activities:
-        duration = int((activity.end - activity.start).total_seconds() / 60)
+        duration = activity.get_duration_in_minutes()
         total_duration += duration
 
     return total_duration
