@@ -95,7 +95,7 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
         "|-------|-----|---------------|-----------------------|---------------|",
     ]
 
-    today_activities = [x for x in activities if x.start.date() == last_start.date()]
+    today_activities = get_daily_activities(activities)
     for i, activity in enumerate(today_activities):
         start = activity.start.strftime("%H:%M")
         end = activity.end.strftime("%H:%M")
@@ -134,12 +134,8 @@ def create_total_activity_report(activities: list[Activity]) -> str:
 def create_weekly_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    last_start = activities[-1].start
-    last_year, last_week, _ = last_start.isocalendar()
-    week_activities = [
-        x for x in activities
-        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
-    ]
+    _, last_week, _ = activities[-1].start.isocalendar()
+    week_activities = get_weekly_activities(activities)
 
     total_duration = get_total_duration(week_activities) / 60.0
     total_break_duration = get_total_break_duration(week_activities) / 60.0
@@ -152,6 +148,10 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
         f"**Total Break Duration:** {total_break_duration:.2f}h",
     ]
     return "\n".join(output)
+
+def get_daily_activities(activities: list[Activity]) -> list[Activity]:
+    last_start = activities[-1].start
+    return [x for x in activities if x.start.date() == last_start.date()]
 
 def get_total_break_duration(activities: list[Activity]) -> int:
     total_break_duration = 0
@@ -180,6 +180,14 @@ def get_total_duration(activities: list[Activity]) -> int:
         total_duration += duration
 
     return total_duration
+
+def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
+    last_start = activities[-1].start
+    last_year, last_week, _ = last_start.isocalendar()
+    return [
+        x for x in activities
+        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
+    ]
 
 
 if __name__ == "__main__":
