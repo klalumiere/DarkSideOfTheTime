@@ -129,11 +129,11 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
         start = activity.start.strftime("%H:%M")
         end = activity.end.strftime("%H:%M")
         duration = activity.get_duration_in_minutes()
-        if i == 0:
-            break_duration = 0
-        else:
-            previous = today_activities[i - 1]
-            break_duration = activity.get_break_duration_in_minutes(previous)
+        break_duration = (
+            0
+            if i == 0
+            else activity.get_break_duration_in_minutes(today_activities[i - 1])
+        )
         output.append(
             f"| {start} | {end} | {duration} | {break_duration} "
             f"| {activity.activity_type} |"
@@ -184,8 +184,8 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
 
 
 def get_daily_activities(activities: list[Activity]) -> list[Activity]:
-    last_start = activities[-1].start
-    return [x for x in activities if x.start.date() == last_start.date()]
+    last_date = activities[-1].start.date()
+    return [x for x in activities if x.start.date() == last_date]
 
 
 def get_total_break_duration(activities: list[Activity]) -> int:
@@ -194,14 +194,11 @@ def get_total_break_duration(activities: list[Activity]) -> int:
         return total_break_duration
 
     for i, activity in enumerate(activities):
-        if i == 0:
-            break_duration = 0
-        else:
+        if i > 0:
             previous = activities[i - 1]
             if activity.start.date() != previous.end.date():
                 continue
-            break_duration = activity.get_break_duration_in_minutes(previous)
-        total_break_duration += break_duration
+            total_break_duration += activity.get_break_duration_in_minutes(previous)
 
     return total_break_duration
 
@@ -219,8 +216,7 @@ def get_total_duration(activities: list[Activity]) -> int:
 
 
 def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
-    last_start = activities[-1].start
-    last_year, last_week, _ = last_start.isocalendar()
+    last_year, last_week, _ = activities[-1].start.isocalendar()
     return [
         x
         for x in activities
