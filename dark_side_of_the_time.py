@@ -2,6 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import DefaultDict
 import csv
 import io
 import os
@@ -32,21 +33,26 @@ class Activity:
         date_start_str = f"{date_str} {values['time_start'].strip()}"
         date_end_str = f"{date_str} {time_end}"
 
-        return cls(start=datetime.strptime(date_start_str, DATE_TIME_FORMAT),
-                   end=datetime.strptime(date_end_str, DATE_TIME_FORMAT),
-                   activity_type=activity_type)
+        return cls(
+            start=datetime.strptime(date_start_str, DATE_TIME_FORMAT),
+            end=datetime.strptime(date_end_str, DATE_TIME_FORMAT),
+            activity_type=activity_type,
+        )
 
 
 def main():
     activities = read_activities()
-    output = "\n".join([
-        create_total_activity_report(activities),
-        "",
-        create_weekly_activity_report(activities),
-        "",
-        create_daily_activity_report(activities)
-    ])
+    output = "\n".join(
+        [
+            create_total_activity_report(activities),
+            "",
+            create_weekly_activity_report(activities),
+            "",
+            create_daily_activity_report(activities),
+        ]
+    )
     print(output)
+
 
 def read_activities() -> list[Activity]:
     data_str = os.environ.get(DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV)
@@ -54,20 +60,27 @@ def read_activities() -> list[Activity]:
     data_csv = Path(data_str).read_text() if data_str else None
     schema = Path(schema_str).read_text() if schema_str else None
     if not data_csv:
-        print(f"You need to define the environment variable {DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV}"
-            " to a valid data file path.")
+        print(
+            f"You need to define the environment variable {DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV}"
+            " to a valid data file path."
+        )
         exit(1)
     if not schema:
-        print(f"You need to define the environment variable {DARK_SIDE_OF_THE_TIME_SCHEMA_FILE_ENV}"
-            " to a valid schema file path.")
+        print(
+            f"You need to define the environment variable {DARK_SIDE_OF_THE_TIME_SCHEMA_FILE_ENV}"
+            " to a valid schema file path."
+        )
         exit(1)
-    return [Activity.deserialize(x, schema) for x in csv.DictReader(io.StringIO(data_csv))]
+    return [
+        Activity.deserialize(x, schema) for x in csv.DictReader(io.StringIO(data_csv))
+    ]
+
 
 def create_activity_duration_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
 
-    activity_totals = defaultdict(int)
+    activity_totals: DefaultDict[str, int] = defaultdict(int)
     total_duration = 0
     for activity in activities:
         duration = int((activity.end - activity.start).total_seconds() / 60)
@@ -78,11 +91,16 @@ def create_activity_duration_report(activities: list[Activity]) -> str:
         "| Activity Type | Total Duration (h) | Relative Duration |",
         "|---------------|--------------------|-------------------|",
     ]
-    sorted_activity_totals = sorted(activity_totals.items(), key=lambda x: x[1], reverse=True)
+    sorted_activity_totals = sorted(
+        activity_totals.items(), key=lambda x: x[1], reverse=True
+    )
     for activity_type, duration in sorted_activity_totals:
-        output.append(f"| {activity_type} | {duration / 60.0:.2f}"
-            f"| {duration / total_duration:.2f} |")
+        output.append(
+            f"| {activity_type} | {duration / 60.0:.2f}"
+            f"| {duration / total_duration:.2f} |"
+        )
     return "\n".join(output)
+
 
 def create_daily_activity_report(activities: list[Activity]) -> str:
     if not activities:
@@ -105,8 +123,10 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
         else:
             previous = today_activities[i - 1]
             break_duration = int((activity.start - previous.end).total_seconds() / 60)
-        output.append(f"| {start} | {end} | {duration} | {break_duration} "
-                      f"| {activity.activity_type} |")
+        output.append(
+            f"| {start} | {end} | {duration} | {break_duration} "
+            f"| {activity.activity_type} |"
+        )
 
     total_duration = get_total_duration(today_activities) / 60.0
     total_break_duration = get_total_break_duration(today_activities) / 60.0
@@ -114,6 +134,7 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
     output.append(f"**Total Duration:** {total_duration :.2f}h")
     output.append(f"**Total Break Duration:** {total_break_duration:.2f}h")
     return "\n".join(output)
+
 
 def create_total_activity_report(activities: list[Activity]) -> str:
     if not activities:
@@ -130,6 +151,7 @@ def create_total_activity_report(activities: list[Activity]) -> str:
         f"**Total Break Duration:** {total_break_duration:.2f}h",
     ]
     return "\n".join(output)
+
 
 def create_weekly_activity_report(activities: list[Activity]) -> str:
     if not activities:
@@ -149,9 +171,11 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
     ]
     return "\n".join(output)
 
+
 def get_daily_activities(activities: list[Activity]) -> list[Activity]:
     last_start = activities[-1].start
     return [x for x in activities if x.start.date() == last_start.date()]
+
 
 def get_total_break_duration(activities: list[Activity]) -> int:
     total_break_duration = 0
@@ -167,8 +191,9 @@ def get_total_break_duration(activities: list[Activity]) -> int:
                 continue
             break_duration = int((activity.start - previous.end).total_seconds() / 60)
         total_break_duration += break_duration
-    
+
     return total_break_duration
+
 
 def get_total_duration(activities: list[Activity]) -> int:
     total_duration = 0
@@ -181,12 +206,15 @@ def get_total_duration(activities: list[Activity]) -> int:
 
     return total_duration
 
+
 def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
     last_start = activities[-1].start
     last_year, last_week, _ = last_start.isocalendar()
     return [
-        x for x in activities
-        if (x.start.isocalendar()[0], x.start.isocalendar()[1]) == (last_year, last_week)
+        x
+        for x in activities
+        if (x.start.isocalendar()[0], x.start.isocalendar()[1])
+        == (last_year, last_week)
     ]
 
 
