@@ -21,6 +21,7 @@ class Activity:
 
     @classmethod
     def deserialize(cls, dirty_values: dict[str, str], schema: str) -> "Activity":
+        cls.validate_csv(dirty_values)
         values = {k.strip(): v.strip() for k, v in dirty_values.items()}
         activity_type = values["activity_type"].strip()
         if activity_type not in schema:
@@ -49,6 +50,15 @@ class Activity:
         duration = int((self.end - self.start).total_seconds() / 60)
         assert duration >= 0
         return duration
+
+    @staticmethod
+    def validate_csv(dirty_values: dict[str, str]) -> None:
+        values = {k.strip(): v for k, v in dirty_values.items()}
+        required_fields = ["date", "time_start", "activity_type"]
+        for field in required_fields:
+            assert field in values and values[field], (
+                f"Missing required field: '{field}'"
+            )
 
 
 def main():
