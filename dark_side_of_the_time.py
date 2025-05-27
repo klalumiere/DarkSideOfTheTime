@@ -10,7 +10,7 @@ import os
 DARK_SIDE_OF_THE_TIME_DATA_FILE_ENV = "DARK_SIDE_OF_THE_TIME_DATA_FILE"
 DARK_SIDE_OF_THE_TIME_SCHEMA_FILE_ENV = "DARK_SIDE_OF_THE_TIME_SCHEMA_FILE"
 DATE_FORMAT = "%b %d"
-DATE_TIME_FORMAT = f"{DATE_FORMAT} %H:%M"
+YEAR_DATE_TIME_FORMAT = f"%Y {DATE_FORMAT} %H:%M"
 
 
 @dataclass
@@ -27,17 +27,18 @@ class Activity:
         if activity_type not in schema:
             raise ValueError(f"Activity type '{activity_type}' not found in schema.")
 
+        year_str = values["year"].strip()
         date_str = values["date"].strip()
         time_start = values["time_start"].strip()
         time_end = values["time_end"].strip()
         if not time_end:
             time_end = time_start
-        date_start_str = f"{date_str} {time_start}"
-        date_end_str = f"{date_str} {time_end}"
+        date_start_str = f"{year_str} {date_str} {time_start}"
+        date_end_str = f"{year_str} {date_str} {time_end}"
 
         return cls(
-            start=datetime.strptime(date_start_str, DATE_TIME_FORMAT),
-            end=datetime.strptime(date_end_str, DATE_TIME_FORMAT),
+            start=datetime.strptime(date_start_str, YEAR_DATE_TIME_FORMAT),
+            end=datetime.strptime(date_end_str, YEAR_DATE_TIME_FORMAT),
             activity_type=activity_type,
         )
 
@@ -54,7 +55,7 @@ class Activity:
     @staticmethod
     def validate_csv(dirty_values: dict[str, str]) -> None:
         values = {k.strip(): v for k, v in dirty_values.items()}
-        required_fields = ["date", "time_start", "activity_type"]
+        required_fields = ["year", "date", "time_start", "activity_type"]
         for field in required_fields:
             assert field in values and values[field], (
                 f"Missing required field: '{field}'"
@@ -177,7 +178,7 @@ def create_total_activity_report(activities: list[Activity]) -> str:
 def create_weekly_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    _, last_week, _ = activities[-1].start.isocalendar()
+    last_week = get_week_index(activities[-1].start)
     week_activities = get_weekly_activities(activities)
 
     total_duration = get_total_duration(week_activities) / 60.0
@@ -225,13 +226,17 @@ def get_total_duration(activities: list[Activity]) -> int:
     return total_duration
 
 
+def get_week_index(date: datetime) -> int:
+    return int(date.strftime("%U"))
+
+
 def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
-    last_year, last_week, _ = activities[-1].start.isocalendar()
+    last_activity_date = activities[-1].start
+    last_year, last_week = last_activity_date.year, get_week_index(last_activity_date)
     return [
         x
         for x in activities
-        if (x.start.isocalendar()[0], x.start.isocalendar()[1])
-        == (last_year, last_week)
+        if (x.start.year, get_week_index(x.start)) == (last_year, last_week)
     ]
 
 
