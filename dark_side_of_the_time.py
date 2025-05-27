@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import DefaultDict
 import csv
@@ -67,6 +67,8 @@ def main():
     output = "\n".join(
         [
             create_total_activity_report(activities),
+            "",
+            create_previous_week_activity_report(activities),
             "",
             create_weekly_activity_report(activities),
             "",
@@ -158,6 +160,24 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
     return "\n".join(output)
 
 
+def create_previous_week_activity_report(activities: list[Activity]) -> str:
+    if not activities:
+        return ""
+    week_activities = get_previous_week_activities(activities)
+
+    total_duration = get_total_duration(week_activities) / 60.0
+    total_break_duration = get_total_break_duration(week_activities) / 60.0
+    output = [
+        "# Last Week",
+        "",
+        create_activity_duration_report(week_activities),
+        "",
+        f"**Total Duration:** {total_duration:.2f}h",
+        f"**Total Break Duration:** {total_break_duration:.2f}h",
+    ]
+    return "\n".join(output)
+
+
 def create_total_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
@@ -178,13 +198,12 @@ def create_total_activity_report(activities: list[Activity]) -> str:
 def create_weekly_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    last_week = get_week_index(activities[-1].start)
     week_activities = get_weekly_activities(activities)
 
     total_duration = get_total_duration(week_activities) / 60.0
     total_break_duration = get_total_break_duration(week_activities) / 60.0
     output = [
-        f"# Week {last_week}",
+        "# This Week",
         "",
         create_activity_duration_report(week_activities),
         "",
@@ -197,6 +216,21 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
 def get_daily_activities(activities: list[Activity]) -> list[Activity]:
     last_date = activities[-1].start.date()
     return [x for x in activities if x.start.date() == last_date]
+
+
+def get_date_at_midnight(date: datetime) -> datetime:
+    return date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_days_since_sunday(date: datetime) -> int:
+    return (date.weekday() + 1) % 7
+
+
+def get_previous_week_activities(activities: list[Activity]) -> list[Activity]:
+    date = activities[-1].start
+    sunday = get_date_at_midnight(date - timedelta(days=get_days_since_sunday(date)))
+    previous_sunday = sunday - timedelta(days=7)
+    return [x for x in activities if previous_sunday <= x.start < sunday]
 
 
 def get_total_break_duration(activities: list[Activity]) -> int:
@@ -226,18 +260,10 @@ def get_total_duration(activities: list[Activity]) -> int:
     return total_duration
 
 
-def get_week_index(date: datetime) -> int:
-    return int(date.strftime("%U"))
-
-
 def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
-    last_activity_date = activities[-1].start
-    last_year, last_week = last_activity_date.year, get_week_index(last_activity_date)
-    return [
-        x
-        for x in activities
-        if (x.start.year, get_week_index(x.start)) == (last_year, last_week)
-    ]
+    date = activities[-1].start
+    sunday = get_date_at_midnight(date - timedelta(days=get_days_since_sunday(date)))
+    return [x for x in activities if sunday <= x.start]
 
 
 if __name__ == "__main__":
