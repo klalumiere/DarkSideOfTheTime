@@ -163,7 +163,7 @@ def create_daily_activity_report(activities: list[Activity]) -> str:
 def create_previous_week_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    week_activities = get_previous_week_activities(activities)
+    week_activities = get_last_week_activities(activities)
 
     total_duration = get_total_duration(week_activities) / 60.0
     total_break_duration = get_total_break_duration(week_activities) / 60.0
@@ -198,7 +198,7 @@ def create_total_activity_report(activities: list[Activity]) -> str:
 def create_weekly_activity_report(activities: list[Activity]) -> str:
     if not activities:
         return ""
-    week_activities = get_weekly_activities(activities)
+    week_activities = get_this_week_activities(activities)
 
     total_duration = get_total_duration(week_activities) / 60.0
     total_break_duration = get_total_break_duration(week_activities) / 60.0
@@ -226,44 +226,34 @@ def get_days_since_sunday(date: datetime) -> int:
     return (date.weekday() + 1) % 7
 
 
-def get_previous_week_activities(activities: list[Activity]) -> list[Activity]:
+def get_last_week_activities(activities: list[Activity]) -> list[Activity]:
     date = activities[-1].start
-    sunday = get_date_at_midnight(date - timedelta(days=get_days_since_sunday(date)))
+    sunday = get_sunday_before(date)
     previous_sunday = sunday - timedelta(days=7)
     return [x for x in activities if previous_sunday <= x.start < sunday]
 
 
+def get_sunday_before(date: datetime) -> datetime:
+    return get_date_at_midnight(date - timedelta(days=get_days_since_sunday(date)))
+
+
+def get_this_week_activities(activities: list[Activity]) -> list[Activity]:
+    date = activities[-1].start
+    sunday = get_sunday_before(date)
+    return [x for x in activities if sunday <= x.start]
+
+
 def get_total_break_duration(activities: list[Activity]) -> int:
     total_break_duration = 0
-    if not activities:
-        return total_break_duration
-
-    for i, activity in enumerate(activities):
-        if i > 0:
-            previous = activities[i - 1]
-            if activity.start.date() != previous.end.date():
-                continue
+    for i, activity in enumerate(activities[1:], start=1):
+        previous = activities[i - 1]
+        if activity.start.date() == previous.end.date():
             total_break_duration += activity.get_break_duration_in_minutes(previous)
-
     return total_break_duration
 
 
 def get_total_duration(activities: list[Activity]) -> int:
-    total_duration = 0
-    if not activities:
-        return total_duration
-
-    for activity in activities:
-        duration = activity.get_duration_in_minutes()
-        total_duration += duration
-
-    return total_duration
-
-
-def get_weekly_activities(activities: list[Activity]) -> list[Activity]:
-    date = activities[-1].start
-    sunday = get_date_at_midnight(date - timedelta(days=get_days_since_sunday(date)))
-    return [x for x in activities if sunday <= x.start]
+    return sum(x.get_duration_in_minutes() for x in activities)
 
 
 if __name__ == "__main__":
