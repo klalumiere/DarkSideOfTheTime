@@ -72,6 +72,8 @@ def main():
             "",
             create_weekly_activity_report(activities),
             "",
+            create_yesterday_activity_report(activities),
+            "",
             create_daily_activity_report(activities),
         ]
     )
@@ -213,6 +215,24 @@ def create_weekly_activity_report(activities: list[Activity]) -> str:
     return "\n".join(output)
 
 
+def create_yesterday_activity_report(activities: list[Activity]) -> str:
+    if not activities:
+        return ""
+    week_activities = get_yesterday_activities(activities)
+
+    total_duration = get_total_duration(week_activities) / 60.0
+    total_break_duration = get_total_break_duration(week_activities) / 60.0
+    output = [
+        "# Yesterday",
+        "",
+        create_activity_duration_report(week_activities),
+        "",
+        f"**Total Duration:** {total_duration:.2f}h",
+        f"**Total Break Duration:** {total_break_duration:.2f}h",
+    ]
+    return "\n".join(output)
+
+
 def get_daily_activities(activities: list[Activity]) -> list[Activity]:
     last_date = activities[-1].start.date()
     return [x for x in activities if x.start.date() == last_date]
@@ -231,6 +251,13 @@ def get_last_week_activities(activities: list[Activity]) -> list[Activity]:
     sunday = get_sunday_before(date)
     previous_sunday = sunday - timedelta(days=7)
     return [x for x in activities if previous_sunday <= x.start < sunday]
+
+
+def get_yesterday_activities(activities: list[Activity]) -> list[Activity]:
+    date = activities[-1].start
+    midnight = get_date_at_midnight(date)
+    yesterday = midnight - timedelta(days=1)
+    return [x for x in activities if yesterday <= x.start < midnight]
 
 
 def get_sunday_before(date: datetime) -> datetime:
