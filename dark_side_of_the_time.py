@@ -44,7 +44,9 @@ class Activity:
 
     def get_break_duration_in_minutes(self, previous: "Activity") -> int:
         break_duration = int((self.start - previous.end).total_seconds() / 60)
-        assert break_duration >= 0
+        assert break_duration >= 0, (
+            f"Expected break_duration >= 0 for self={self} and previous={previous}"
+        )
         return break_duration
 
     def get_duration_in_minutes(self) -> int:
